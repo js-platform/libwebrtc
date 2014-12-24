@@ -1136,10 +1136,6 @@ MediaSessionDescriptionFactory::MediaSessionDescriptionFactory(
     : secure_(SEC_DISABLED),
       add_legacy_(true),
       transport_desc_factory_(transport_desc_factory) {
-  channel_manager->GetSupportedAudioCodecs(&audio_codecs_);
-  channel_manager->GetSupportedAudioRtpHeaderExtensions(&audio_rtp_extensions_);
-  channel_manager->GetSupportedVideoCodecs(&video_codecs_);
-  channel_manager->GetSupportedVideoRtpHeaderExtensions(&video_rtp_extensions_);
   channel_manager->GetSupportedDataCodecs(&data_codecs_);
 }
 

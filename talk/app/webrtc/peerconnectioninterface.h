@@ -72,13 +72,12 @@
 #include <vector>
 
 #include "talk/app/webrtc/datachannelinterface.h"
-#include "talk/app/webrtc/dtmfsenderinterface.h"
 #include "talk/app/webrtc/jsep.h"
-#include "talk/app/webrtc/mediastreaminterface.h"
 #include "talk/app/webrtc/statstypes.h"
 #include "talk/app/webrtc/umametrics.h"
 #include "webrtc/base/fileutils.h"
 #include "webrtc/base/socketaddress.h"
+#include "webrtc/base/scoped_ref_ptr.h"
 
 namespace rtc {
 class Thread;
@@ -86,12 +85,9 @@ class Thread;
 
 namespace cricket {
 class PortAllocator;
-class WebRtcVideoDecoderFactory;
-class WebRtcVideoEncoderFactory;
 }
 
 namespace webrtc {
-class AudioDeviceModule;
 class MediaConstraintsInterface;
 
 // MediaStream container interface.
@@ -99,12 +95,6 @@ class StreamCollectionInterface : public rtc::RefCountInterface {
  public:
   // TODO(ronghuawu): Update the function names to c++ style, e.g. find -> Find.
   virtual size_t count() = 0;
-  virtual MediaStreamInterface* at(size_t index) = 0;
-  virtual MediaStreamInterface* find(const std::string& label) = 0;
-  virtual MediaStreamTrackInterface* FindAudioTrack(
-      const std::string& id) = 0;
-  virtual MediaStreamTrackInterface* FindVideoTrack(
-      const std::string& id) = 0;
 
  protected:
   // Dtor protected as objects shouldn't be deleted via this interface.
@@ -235,31 +225,7 @@ class PeerConnectionInterface : public rtc::RefCountInterface {
     kStatsOutputLevelDebug,
   };
 
-  // Accessor methods to active local streams.
-  virtual rtc::scoped_refptr<StreamCollectionInterface>
-      local_streams() = 0;
-
-  // Accessor methods to remote streams.
-  virtual rtc::scoped_refptr<StreamCollectionInterface>
-      remote_streams() = 0;
-
-  // Add a new MediaStream to be sent on this PeerConnection.
-  // Note that a SessionDescription negotiation is needed before the
-  // remote peer can receive the stream.
-  virtual bool AddStream(MediaStreamInterface* stream) = 0;
-
-  // Remove a MediaStream from this PeerConnection.
-  // Note that a SessionDescription negotiation is need before the
-  // remote peer is notified.
-  virtual void RemoveStream(MediaStreamInterface* stream) = 0;
-
-  // Returns pointer to the created DtmfSender on success.
-  // Otherwise returns NULL.
-  virtual rtc::scoped_refptr<DtmfSenderInterface> CreateDtmfSender(
-      AudioTrackInterface* track) = 0;
-
   virtual bool GetStats(StatsObserver* observer,
-                        MediaStreamTrackInterface* track,
                         StatsOutputLevel level) = 0;
 
   virtual rtc::scoped_refptr<DataChannelInterface> CreateDataChannel(
@@ -341,12 +307,6 @@ class PeerConnectionObserver {
   // Triggered when SignalingState or IceState have changed.
   // TODO(bemasc): Remove once callers transition to OnSignalingChange.
   virtual void OnStateChange(StateType state_changed) {}
-
-  // Triggered when media is received on a new stream from remote peer.
-  virtual void OnAddStream(MediaStreamInterface* stream) = 0;
-
-  // Triggered when a remote peer close a stream.
-  virtual void OnRemoveStream(MediaStreamInterface* stream) = 0;
 
   // Triggered when a remote peer open a data channel.
   virtual void OnDataChannel(DataChannelInterface* data_channel) = 0;
@@ -504,39 +464,6 @@ class PeerConnectionFactoryInterface : public rtc::RefCountInterface {
                                   dtls_identity_service, observer);
   }
 
-  virtual rtc::scoped_refptr<MediaStreamInterface>
-      CreateLocalMediaStream(const std::string& label) = 0;
-
-  // Creates a AudioSourceInterface.
-  // |constraints| decides audio processing settings but can be NULL.
-  virtual rtc::scoped_refptr<AudioSourceInterface> CreateAudioSource(
-      const MediaConstraintsInterface* constraints) = 0;
-
-  // Creates a VideoSourceInterface. The new source take ownership of
-  // |capturer|. |constraints| decides video resolution and frame rate but can
-  // be NULL.
-  virtual rtc::scoped_refptr<VideoSourceInterface> CreateVideoSource(
-      cricket::VideoCapturer* capturer,
-      const MediaConstraintsInterface* constraints) = 0;
-
-  // Creates a new local VideoTrack. The same |source| can be used in several
-  // tracks.
-  virtual rtc::scoped_refptr<VideoTrackInterface>
-      CreateVideoTrack(const std::string& label,
-                       VideoSourceInterface* source) = 0;
-
-  // Creates an new AudioTrack. At the moment |source| can be NULL.
-  virtual rtc::scoped_refptr<AudioTrackInterface>
-      CreateAudioTrack(const std::string& label,
-                       AudioSourceInterface* source) = 0;
-
-  // Starts AEC dump using existing file. Takes ownership of |file| and passes
-  // it on to VoiceEngine (via other objects) immediately, which will take
-  // the ownerhip. If the operation fails, the file will be closed.
-  // TODO(grunell): Remove when Chromium has started to use AEC in each source.
-  // http://crbug.com/264611.
-  virtual bool StartAecDump(rtc::PlatformFile file) = 0;
-
  protected:
   // Dtor and ctor protected as objects shouldn't be created or deleted via
   // this interface.
@@ -554,10 +481,7 @@ CreatePeerConnectionFactory();
 rtc::scoped_refptr<PeerConnectionFactoryInterface>
 CreatePeerConnectionFactory(
     rtc::Thread* worker_thread,
-    rtc::Thread* signaling_thread,
-    AudioDeviceModule* default_adm,
-    cricket::WebRtcVideoEncoderFactory* encoder_factory,
-    cricket::WebRtcVideoDecoderFactory* decoder_factory);
+    rtc::Thread* signaling_thread);
 
 }  // namespace webrtc
 

@@ -34,12 +34,11 @@
 #include "talk/app/webrtc/peerconnectionfactory.h"
 #include "talk/app/webrtc/peerconnectioninterface.h"
 #include "talk/app/webrtc/statscollector.h"
-#include "talk/app/webrtc/streamcollection.h"
 #include "talk/app/webrtc/webrtcsession.h"
 #include "webrtc/base/scoped_ptr.h"
 
 namespace webrtc {
-class MediaStreamHandlerContainer;
+//class MediaStreamHandlerContainer;
 
 typedef std::vector<PortAllocatorFactoryInterface::StunConfiguration>
     StunConfigurations;
@@ -63,19 +62,11 @@ class PeerConnection : public PeerConnectionInterface,
       PortAllocatorFactoryInterface* allocator_factory,
       DTLSIdentityServiceInterface* dtls_identity_service,
       PeerConnectionObserver* observer);
-  virtual rtc::scoped_refptr<StreamCollectionInterface> local_streams();
-  virtual rtc::scoped_refptr<StreamCollectionInterface> remote_streams();
-  virtual bool AddStream(MediaStreamInterface* local_stream);
-  virtual void RemoveStream(MediaStreamInterface* local_stream);
-
-  virtual rtc::scoped_refptr<DtmfSenderInterface> CreateDtmfSender(
-      AudioTrackInterface* track);
 
   virtual rtc::scoped_refptr<DataChannelInterface> CreateDataChannel(
       const std::string& label,
       const DataChannelInit* config);
   virtual bool GetStats(StatsObserver* observer,
-                        webrtc::MediaStreamTrackInterface* track,
                         StatsOutputLevel level);
 
   virtual SignalingState signaling_state();
@@ -118,35 +109,7 @@ class PeerConnection : public PeerConnectionInterface,
   virtual void OnMessage(rtc::Message* msg);
 
   // Implements MediaStreamSignalingObserver.
-  virtual void OnAddRemoteStream(MediaStreamInterface* stream) OVERRIDE;
-  virtual void OnRemoveRemoteStream(MediaStreamInterface* stream) OVERRIDE;
   virtual void OnAddDataChannel(DataChannelInterface* data_channel) OVERRIDE;
-  virtual void OnAddRemoteAudioTrack(MediaStreamInterface* stream,
-                                     AudioTrackInterface* audio_track,
-                                     uint32 ssrc) OVERRIDE;
-  virtual void OnAddRemoteVideoTrack(MediaStreamInterface* stream,
-                                     VideoTrackInterface* video_track,
-                                     uint32 ssrc) OVERRIDE;
-  virtual void OnRemoveRemoteAudioTrack(
-      MediaStreamInterface* stream,
-      AudioTrackInterface* audio_track) OVERRIDE;
-  virtual void OnRemoveRemoteVideoTrack(
-      MediaStreamInterface* stream,
-      VideoTrackInterface* video_track) OVERRIDE;
-  virtual void OnAddLocalAudioTrack(MediaStreamInterface* stream,
-                                    AudioTrackInterface* audio_track,
-                                    uint32 ssrc) OVERRIDE;
-  virtual void OnAddLocalVideoTrack(MediaStreamInterface* stream,
-                                    VideoTrackInterface* video_track,
-                                    uint32 ssrc) OVERRIDE;
-  virtual void OnRemoveLocalAudioTrack(
-      MediaStreamInterface* stream,
-      AudioTrackInterface* audio_track,
-      uint32 ssrc) OVERRIDE;
-  virtual void OnRemoveLocalVideoTrack(
-      MediaStreamInterface* stream,
-      VideoTrackInterface* video_track) OVERRIDE;
-  virtual void OnRemoveLocalStream(MediaStreamInterface* stream);
 
   // Implements IceObserver
   virtual void OnIceConnectionChange(IceConnectionState new_state);
@@ -196,7 +159,6 @@ class PeerConnection : public PeerConnectionInterface,
   rtc::scoped_ptr<cricket::PortAllocator> port_allocator_;
   rtc::scoped_ptr<WebRtcSession> session_;
   rtc::scoped_ptr<MediaStreamSignaling> mediastream_signaling_;
-  rtc::scoped_ptr<MediaStreamHandlerContainer> stream_handler_container_;
   rtc::scoped_ptr<StatsCollector> stats_;
 };
 

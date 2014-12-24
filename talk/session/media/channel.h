@@ -34,10 +34,8 @@
 #include "talk/media/base/mediachannel.h"
 #include "talk/media/base/mediaengine.h"
 #include "talk/media/base/streamparams.h"
-#include "talk/media/base/videocapturer.h"
 #include "webrtc/p2p/base/session.h"
 #include "webrtc/p2p/client/socketmonitor.h"
-#include "talk/session/media/audiomonitor.h"
 #include "talk/session/media/bundlefilter.h"
 #include "talk/session/media/mediamonitor.h"
 #include "talk/session/media/mediasession.h"
@@ -117,9 +115,6 @@ class BaseChannel
                         std::string* error_desc);
 
   bool Enable(bool enable);
-  // Mute sending media on the stream with SSRC |ssrc|
-  // If there is only one sending stream SSRC 0 can be used.
-  bool MuteStream(uint32 ssrc, bool mute);
 
   // Multiplexing
   bool AddRecvStream(const StreamParams& sp);
@@ -279,8 +274,6 @@ class BaseChannel
 
   void EnableMedia_w();
   void DisableMedia_w();
-  virtual bool MuteStream_w(uint32 ssrc, bool mute);
-  bool IsStreamMuted_w(uint32 ssrc);
   void ChannelWritable_w();
   void ChannelNotWritable_w();
   bool AddRecvStream_w(const StreamParams& sp);
@@ -387,214 +380,10 @@ class BaseChannel
   bool was_ever_writable_;
   MediaContentDirection local_content_direction_;
   MediaContentDirection remote_content_direction_;
-  std::set<uint32> muted_streams_;
   bool has_received_packet_;
   bool dtls_keyed_;
   bool secure_required_;
   int rtp_abs_sendtime_extn_id_;
-};
-
-// VoiceChannel is a specialization that adds support for early media, DTMF,
-// and input/output level monitoring.
-class VoiceChannel : public BaseChannel {
- public:
-  VoiceChannel(rtc::Thread* thread, MediaEngineInterface* media_engine,
-               VoiceMediaChannel* channel, BaseSession* session,
-               const std::string& content_name, bool rtcp);
-  ~VoiceChannel();
-  bool Init();
-  bool SetRemoteRenderer(uint32 ssrc, AudioRenderer* renderer);
-  bool SetLocalRenderer(uint32 ssrc, AudioRenderer* renderer);
-
-  // downcasts a MediaChannel
-  virtual VoiceMediaChannel* media_channel() const {
-    return static_cast<VoiceMediaChannel*>(BaseChannel::media_channel());
-  }
-
-  bool SetRingbackTone(const void* buf, int len);
-  void SetEarlyMedia(bool enable);
-  // This signal is emitted when we have gone a period of time without
-  // receiving early media. When received, a UI should start playing its
-  // own ringing sound
-  sigslot::signal1<VoiceChannel*> SignalEarlyMediaTimeout;
-
-  bool PlayRingbackTone(uint32 ssrc, bool play, bool loop);
-  // TODO(ronghuawu): Replace PressDTMF with InsertDtmf.
-  bool PressDTMF(int digit, bool playout);
-  // Returns if the telephone-event has been negotiated.
-  bool CanInsertDtmf();
-  // Send and/or play a DTMF |event| according to the |flags|.
-  // The DTMF out-of-band signal will be used on sending.
-  // The |ssrc| should be either 0 or a valid send stream ssrc.
-  // The valid value for the |event| are 0 which corresponding to DTMF
-  // event 0-9, *, #, A-D.
-  bool InsertDtmf(uint32 ssrc, int event_code, int duration, int flags);
-  bool SetOutputScaling(uint32 ssrc, double left, double right);
-  // Get statistics about the current media session.
-  bool GetStats(VoiceMediaInfo* stats);
-
-  // Monitoring functions
-  sigslot::signal2<VoiceChannel*, const std::vector<ConnectionInfo>&>
-      SignalConnectionMonitor;
-
-  void StartMediaMonitor(int cms);
-  void StopMediaMonitor();
-  sigslot::signal2<VoiceChannel*, const VoiceMediaInfo&> SignalMediaMonitor;
-
-  void StartAudioMonitor(int cms);
-  void StopAudioMonitor();
-  bool IsAudioMonitorRunning() const;
-  sigslot::signal2<VoiceChannel*, const AudioInfo&> SignalAudioMonitor;
-
-  void StartTypingMonitor(const TypingMonitorOptions& settings);
-  void StopTypingMonitor();
-  bool IsTypingMonitorRunning() const;
-
-  // Overrides BaseChannel::MuteStream_w.
-  virtual bool MuteStream_w(uint32 ssrc, bool mute);
-
-  int GetInputLevel_w();
-  int GetOutputLevel_w();
-  void GetActiveStreams_w(AudioInfo::StreamList* actives);
-
-  // Signal errors from VoiceMediaChannel.  Arguments are:
-  //     ssrc(uint32), and error(VoiceMediaChannel::Error).
-  sigslot::signal3<VoiceChannel*, uint32, VoiceMediaChannel::Error>
-      SignalMediaError;
-
-  // Configuration and setting.
-  bool SetChannelOptions(const AudioOptions& options);
-
- private:
-  // overrides from BaseChannel
-  virtual void OnChannelRead(TransportChannel* channel,
-                             const char* data, size_t len,
-                             const rtc::PacketTime& packet_time,
-                             int flags);
-  virtual void ChangeState();
-  virtual const ContentInfo* GetFirstContent(const SessionDescription* sdesc);
-  virtual bool SetLocalContent_w(const MediaContentDescription* content,
-                                 ContentAction action,
-                                 std::string* error_desc);
-  virtual bool SetRemoteContent_w(const MediaContentDescription* content,
-                                  ContentAction action,
-                                  std::string* error_desc);
-  bool SetRingbackTone_w(const void* buf, int len);
-  bool PlayRingbackTone_w(uint32 ssrc, bool play, bool loop);
-  void HandleEarlyMediaTimeout();
-  bool InsertDtmf_w(uint32 ssrc, int event, int duration, int flags);
-  bool SetOutputScaling_w(uint32 ssrc, double left, double right);
-  bool GetStats_w(VoiceMediaInfo* stats);
-
-  virtual void OnMessage(rtc::Message* pmsg);
-  virtual void GetSrtpCiphers(std::vector<std::string>* ciphers) const;
-  virtual void OnConnectionMonitorUpdate(
-      SocketMonitor* monitor, const std::vector<ConnectionInfo>& infos);
-  virtual void OnMediaMonitorUpdate(
-      VoiceMediaChannel* media_channel, const VoiceMediaInfo& info);
-  void OnAudioMonitorUpdate(AudioMonitor* monitor, const AudioInfo& info);
-  void OnVoiceChannelError(uint32 ssrc, VoiceMediaChannel::Error error);
-  void SendLastMediaError();
-  void OnSrtpError(uint32 ssrc, SrtpFilter::Mode mode, SrtpFilter::Error error);
-
-  static const int kEarlyMediaTimeout = 1000;
-  bool received_media_;
-  rtc::scoped_ptr<VoiceMediaMonitor> media_monitor_;
-  rtc::scoped_ptr<AudioMonitor> audio_monitor_;
-  rtc::scoped_ptr<TypingMonitor> typing_monitor_;
-};
-
-// VideoChannel is a specialization for video.
-class VideoChannel : public BaseChannel {
- public:
-  VideoChannel(rtc::Thread* thread, MediaEngineInterface* media_engine,
-               VideoMediaChannel* channel, BaseSession* session,
-               const std::string& content_name, bool rtcp,
-               VoiceChannel* voice_channel);
-  ~VideoChannel();
-  bool Init();
-
-  bool SetRenderer(uint32 ssrc, VideoRenderer* renderer);
-  bool ApplyViewRequest(const ViewRequest& request);
-
-  // TODO(pthatcher): Refactor to use a "capture id" instead of an
-  // ssrc here as the "key".
-  // Passes ownership of the capturer to the channel.
-  bool AddScreencast(uint32 ssrc, VideoCapturer* capturer);
-  bool SetCapturer(uint32 ssrc, VideoCapturer* capturer);
-  bool RemoveScreencast(uint32 ssrc);
-  // True if we've added a screencast.  Doesn't matter if the capturer
-  // has been started or not.
-  bool IsScreencasting();
-  int GetScreencastFps(uint32 ssrc);
-  int GetScreencastMaxPixels(uint32 ssrc);
-  // Get statistics about the current media session.
-  bool GetStats(const StatsOptions& options, VideoMediaInfo* stats);
-
-  sigslot::signal2<VideoChannel*, const std::vector<ConnectionInfo>&>
-      SignalConnectionMonitor;
-
-  void StartMediaMonitor(int cms);
-  void StopMediaMonitor();
-  sigslot::signal2<VideoChannel*, const VideoMediaInfo&> SignalMediaMonitor;
-  sigslot::signal2<uint32, rtc::WindowEvent> SignalScreencastWindowEvent;
-
-  bool SendIntraFrame();
-  bool RequestIntraFrame();
-  sigslot::signal3<VideoChannel*, uint32, VideoMediaChannel::Error>
-      SignalMediaError;
-
-  // Configuration and setting.
-  bool SetChannelOptions(const VideoOptions& options);
-
- protected:
-  // downcasts a MediaChannel
-  virtual VideoMediaChannel* media_channel() const {
-    return static_cast<VideoMediaChannel*>(BaseChannel::media_channel());
-  }
-
- private:
-  typedef std::map<uint32, VideoCapturer*> ScreencastMap;
-  struct ScreencastDetailsData;
-
-  // overrides from BaseChannel
-  virtual void ChangeState();
-  virtual const ContentInfo* GetFirstContent(const SessionDescription* sdesc);
-  virtual bool SetLocalContent_w(const MediaContentDescription* content,
-                                 ContentAction action,
-                                 std::string* error_desc);
-  virtual bool SetRemoteContent_w(const MediaContentDescription* content,
-                                  ContentAction action,
-                                  std::string* error_desc);
-  bool ApplyViewRequest_w(const ViewRequest& request);
-
-  bool AddScreencast_w(uint32 ssrc, VideoCapturer* capturer);
-  bool RemoveScreencast_w(uint32 ssrc);
-  void OnScreencastWindowEvent_s(uint32 ssrc, rtc::WindowEvent we);
-  bool IsScreencasting_w() const;
-  void GetScreencastDetails_w(ScreencastDetailsData* d) const;
-  bool GetStats_w(VideoMediaInfo* stats);
-
-  virtual void OnMessage(rtc::Message* pmsg);
-  virtual void GetSrtpCiphers(std::vector<std::string>* ciphers) const;
-  virtual void OnConnectionMonitorUpdate(
-      SocketMonitor* monitor, const std::vector<ConnectionInfo>& infos);
-  virtual void OnMediaMonitorUpdate(
-      VideoMediaChannel* media_channel, const VideoMediaInfo& info);
-  virtual void OnScreencastWindowEvent(uint32 ssrc,
-                                       rtc::WindowEvent event);
-  virtual void OnStateChange(VideoCapturer* capturer, CaptureState ev);
-  bool GetLocalSsrc(const VideoCapturer* capturer, uint32* ssrc);
-
-  void OnVideoChannelError(uint32 ssrc, VideoMediaChannel::Error error);
-  void OnSrtpError(uint32 ssrc, SrtpFilter::Mode mode, SrtpFilter::Error error);
-
-  VoiceChannel* voice_channel_;
-  VideoRenderer* renderer_;
-  ScreencastMap screencast_capturers_;
-  rtc::scoped_ptr<VideoMediaMonitor> media_monitor_;
-
-  rtc::WindowEvent previous_we_;
 };
 
 // DataChannel is a specialization for data.

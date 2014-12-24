@@ -54,26 +54,6 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface,
 
   bool Initialize();
 
-  virtual rtc::scoped_refptr<MediaStreamInterface>
-      CreateLocalMediaStream(const std::string& label);
-
-  virtual rtc::scoped_refptr<AudioSourceInterface> CreateAudioSource(
-      const MediaConstraintsInterface* constraints);
-
-  virtual rtc::scoped_refptr<VideoSourceInterface> CreateVideoSource(
-      cricket::VideoCapturer* capturer,
-      const MediaConstraintsInterface* constraints);
-
-  virtual rtc::scoped_refptr<VideoTrackInterface>
-      CreateVideoTrack(const std::string& id,
-                       VideoSourceInterface* video_source);
-
-  virtual rtc::scoped_refptr<AudioTrackInterface>
-      CreateAudioTrack(const std::string& id,
-                       AudioSourceInterface* audio_source);
-
-  virtual bool StartAecDump(rtc::PlatformFile file);
-
   virtual cricket::ChannelManager* channel_manager();
   virtual rtc::Thread* signaling_thread();
   virtual rtc::Thread* worker_thread();
@@ -83,20 +63,12 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface,
   PeerConnectionFactory();
   PeerConnectionFactory(
       rtc::Thread* worker_thread,
-      rtc::Thread* signaling_thread,
-      AudioDeviceModule* default_adm,
-      cricket::WebRtcVideoEncoderFactory* video_encoder_factory,
-      cricket::WebRtcVideoDecoderFactory* video_decoder_factory);
+      rtc::Thread* signaling_thread);
   virtual ~PeerConnectionFactory();
 
  private:
   bool Initialize_s();
   void Terminate_s();
-  rtc::scoped_refptr<AudioSourceInterface> CreateAudioSource_s(
-      const MediaConstraintsInterface* constraints);
-  rtc::scoped_refptr<VideoSourceInterface> CreateVideoSource_s(
-      cricket::VideoCapturer* capturer,
-      const MediaConstraintsInterface* constraints);
 
   rtc::scoped_refptr<PeerConnectionInterface> CreatePeerConnection_s(
       const PeerConnectionInterface::RTCConfiguration& configuration,
@@ -115,17 +87,7 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface,
   rtc::Thread* worker_thread_;
   Options options_;
   rtc::scoped_refptr<PortAllocatorFactoryInterface> allocator_factory_;
-  // External Audio device used for audio playback.
-  rtc::scoped_refptr<AudioDeviceModule> default_adm_;
   rtc::scoped_ptr<cricket::ChannelManager> channel_manager_;
-  // External Video encoder factory. This can be NULL if the client has not
-  // injected any. In that case, video engine will use the internal SW encoder.
-  rtc::scoped_ptr<cricket::WebRtcVideoEncoderFactory>
-      video_encoder_factory_;
-  // External Video decoder factory. This can be NULL if the client has not
-  // injected any. In that case, video engine will use the internal SW decoder.
-  rtc::scoped_ptr<cricket::WebRtcVideoDecoderFactory>
-      video_decoder_factory_;
 };
 
 }  // namespace webrtc

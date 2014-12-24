@@ -63,20 +63,6 @@ class StatsCollector {
   explicit StatsCollector(WebRtcSession* session);
   virtual ~StatsCollector();
 
-  // Adds a MediaStream with tracks that can be used as a |selector| in a call
-  // to GetStats.
-  void AddStream(MediaStreamInterface* stream);
-
-  // Adds a local audio track that is used for getting some voice statistics.
-  void AddLocalAudioTrack(AudioTrackInterface* audio_track, uint32 ssrc);
-
-  // Removes a local audio tracks that is used for getting some voice
-  // statistics.
-  void RemoveLocalAudioTrack(AudioTrackInterface* audio_track, uint32 ssrc);
-
-  // Gather statistics from the session and store them for future use.
-  void UpdateStats(PeerConnectionInterface::StatsOutputLevel level);
-
   // Gets a StatsReports of the last collected stats. Note that UpdateStats must
   // be called before this function to get the most recent stats. |selector| is
   // a track label or empty string. The most recent reports are stored in
@@ -85,8 +71,10 @@ class StatsCollector {
   // of filling in |reports|.  As is, there's a requirement that the caller
   // uses |reports| immediately without allowing any async activity on
   // the thread (message handling etc) and then discard the results.
-  void GetStats(MediaStreamTrackInterface* track,
-                StatsReports* reports);
+  void GetStats(StatsReports* reports);
+
+  // Gather statistics from the session and store them for future use.
+  void UpdateStats(PeerConnectionInterface::StatsOutputLevel level);
 
   // Prepare an SSRC report for the given ssrc. Used internally
   // in the ExtractStatsFromList template.
@@ -120,8 +108,6 @@ class StatsCollector {
   std::string AddCertificateReports(const rtc::SSLCertificate* cert);
 
   void ExtractSessionInfo();
-  void ExtractVoiceInfo();
-  void ExtractVideoInfo(PeerConnectionInterface::StatsOutputLevel level);
   void BuildSsrcToTransportId();
   webrtc::StatsReport* GetOrCreateReport(const std::string& type,
                                          const std::string& id,
@@ -130,26 +116,12 @@ class StatsCollector {
                                  const std::string& id,
                                  TrackDirection direction);
 
-  // Helper method to get stats from the local audio tracks.
-  void UpdateStatsFromExistingLocalAudioTracks();
-  void UpdateReportFromAudioTrack(AudioTrackInterface* track,
-                                  StatsReport* report);
-
-  // Helper method to get the id for the track identified by ssrc.
-  // |direction| tells if the track is for sending or receiving.
-  bool GetTrackIdBySsrc(uint32 ssrc, std::string* track_id,
-                        TrackDirection direction);
-
   // A map from the report id to the report.
   StatsSet reports_;
   // Raw pointer to the session the statistics are gathered from.
   WebRtcSession* const session_;
   double stats_gathering_started_;
   cricket::ProxyTransportMap proxy_to_transport_;
-
-  typedef std::vector<std::pair<AudioTrackInterface*, uint32> >
-      LocalAudioTrackVector;
-  LocalAudioTrackVector local_audio_tracks_;
 };
 
 }  // namespace webrtc

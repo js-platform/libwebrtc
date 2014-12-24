@@ -39,7 +39,6 @@
 #include "talk/app/webrtc/peerconnectioninterface.h"
 #include "talk/app/webrtc/webrtcsessiondescriptionfactory.h"
 #include "talk/media/base/constants.h"
-#include "talk/media/base/videocapturer.h"
 #include "talk/session/media/channel.h"
 #include "talk/session/media/channelmanager.h"
 #include "talk/session/media/mediasession.h"
@@ -490,14 +489,6 @@ WebRtcSession::WebRtcSession(cricket::ChannelManager* channel_manager,
 WebRtcSession::~WebRtcSession() {
   // Destroy video_channel_ first since it may have a pointer to the
   // voice_channel_.
-  if (video_channel_.get()) {
-    SignalVideoChannelDestroyed();
-    channel_manager_->DestroyVideoChannel(video_channel_.release());
-  }
-  if (voice_channel_.get()) {
-    SignalVoiceChannelDestroyed();
-    channel_manager_->DestroyVoiceChannel(voice_channel_.release());
-  }
   if (data_channel_.get()) {
     SignalDataChannelDestroyed();
     channel_manager_->DestroyDataChannel(data_channel_.release());
@@ -551,93 +542,6 @@ bool WebRtcSession::Initialize(
     mediastream_signaling_->SetDataChannelFactory(this);
   }
 
-  // Find DSCP constraint.
-  if (FindConstraint(
-        constraints,
-        MediaConstraintsInterface::kEnableDscp,
-        &value, NULL)) {
-    audio_options_.dscp.Set(value);
-    video_options_.dscp.Set(value);
-  }
-
-  // Find Suspend Below Min Bitrate constraint.
-  if (FindConstraint(
-          constraints,
-          MediaConstraintsInterface::kEnableVideoSuspendBelowMinBitrate,
-          &value,
-          NULL)) {
-    video_options_.suspend_below_min_bitrate.Set(value);
-  }
-
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kScreencastMinBitrate,
-      &video_options_.screencast_min_bitrate);
-
-  // Find constraints for cpu overuse detection.
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kCpuUnderuseThreshold,
-      &video_options_.cpu_underuse_threshold);
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kCpuOveruseThreshold,
-      &video_options_.cpu_overuse_threshold);
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kCpuOveruseDetection,
-      &video_options_.cpu_overuse_detection);
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kCpuOveruseEncodeUsage,
-      &video_options_.cpu_overuse_encode_usage);
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kCpuUnderuseEncodeRsdThreshold,
-      &video_options_.cpu_underuse_encode_rsd_threshold);
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kCpuOveruseEncodeRsdThreshold,
-      &video_options_.cpu_overuse_encode_rsd_threshold);
-
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kNumUnsignalledRecvStreams,
-      &video_options_.unsignalled_recv_stream_limit);
-  if (video_options_.unsignalled_recv_stream_limit.IsSet()) {
-    int stream_limit;
-    video_options_.unsignalled_recv_stream_limit.Get(&stream_limit);
-    stream_limit = rtc::_min(kMaxUnsignalledRecvStreams, stream_limit);
-    stream_limit = rtc::_max(0, stream_limit);
-    video_options_.unsignalled_recv_stream_limit.Set(stream_limit);
-  }
-
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kHighStartBitrate,
-      &video_options_.video_start_bitrate);
-
-  if (FindConstraint(
-      constraints,
-      MediaConstraintsInterface::kVeryHighBitrate,
-      &value,
-      NULL)) {
-    video_options_.video_highest_bitrate.Set(
-        cricket::VideoOptions::VERY_HIGH);
-  } else if (FindConstraint(
-      constraints,
-      MediaConstraintsInterface::kHighBitrate,
-      &value,
-      NULL)) {
-    video_options_.video_highest_bitrate.Set(
-        cricket::VideoOptions::HIGH);
-  }
-
-  SetOptionFromOptionalConstraint(constraints,
-      MediaConstraintsInterface::kCombinedAudioVideoBwe,
-      &audio_options_.combined_audio_video_bwe);
-
-  const cricket::VideoCodec default_codec(
-      JsepSessionDescription::kDefaultVideoCodecId,
-      JsepSessionDescription::kDefaultVideoCodecName,
-      JsepSessionDescription::kMaxVideoCodecWidth,
-      JsepSessionDescription::kMaxVideoCodecHeight,
-      JsepSessionDescription::kDefaultVideoCodecFramerate,
-      JsepSessionDescription::kDefaultVideoCodecPreference);
-  channel_manager_->SetDefaultVideoEncoderConfig(
-      cricket::VideoEncoderConfig(default_codec));
-
   webrtc_session_desc_factory_.reset(new WebRtcSessionDescriptionFactory(
       signaling_thread(),
       channel_manager_,
@@ -662,8 +566,6 @@ bool WebRtcSession::Initialize(
 void WebRtcSession::Terminate() {
   SetState(STATE_RECEIVEDTERMINATE);
   RemoveUnusedChannelsAndTransports(NULL);
-  ASSERT(voice_channel_.get() == NULL);
-  ASSERT(video_channel_.get() == NULL);
   ASSERT(data_channel_.get() == NULL);
 }
 
@@ -929,176 +831,10 @@ bool WebRtcSession::SetIceTransports(
         ConvertIceTransportTypeToCandidateFilter(type));
 }
 
-bool WebRtcSession::GetLocalTrackIdBySsrc(uint32 ssrc, std::string* track_id) {
-  if (!BaseSession::local_description())
-    return false;
-  return webrtc::GetTrackIdBySsrc(
-      BaseSession::local_description(), ssrc, track_id);
-}
-
-bool WebRtcSession::GetRemoteTrackIdBySsrc(uint32 ssrc, std::string* track_id) {
-  if (!BaseSession::remote_description())
-    return false;
-  return webrtc::GetTrackIdBySsrc(
-      BaseSession::remote_description(), ssrc, track_id);
-}
-
 std::string WebRtcSession::BadStateErrMsg(State state) {
   std::ostringstream desc;
   desc << "Called in wrong state: " << GetStateString(state);
   return desc.str();
-}
-
-void WebRtcSession::SetAudioPlayout(uint32 ssrc, bool enable,
-                                    cricket::AudioRenderer* renderer) {
-  ASSERT(signaling_thread()->IsCurrent());
-  if (!voice_channel_) {
-    LOG(LS_ERROR) << "SetAudioPlayout: No audio channel exists.";
-    return;
-  }
-  if (!voice_channel_->SetRemoteRenderer(ssrc, renderer)) {
-    // SetRenderer() can fail if the ssrc does not match any playout channel.
-    LOG(LS_ERROR) << "SetAudioPlayout: ssrc is incorrect: " << ssrc;
-    return;
-  }
-  if (!voice_channel_->SetOutputScaling(ssrc, enable ? 1 : 0, enable ? 1 : 0)) {
-    // Allow that SetOutputScaling fail if |enable| is false but assert
-    // otherwise. This in the normal case when the underlying media channel has
-    // already been deleted.
-    ASSERT(enable == false);
-  }
-}
-
-void WebRtcSession::SetAudioSend(uint32 ssrc, bool enable,
-                                 const cricket::AudioOptions& options,
-                                 cricket::AudioRenderer* renderer) {
-  ASSERT(signaling_thread()->IsCurrent());
-  if (!voice_channel_) {
-    LOG(LS_ERROR) << "SetAudioSend: No audio channel exists.";
-    return;
-  }
-  if (!voice_channel_->SetLocalRenderer(ssrc, renderer)) {
-    // SetRenderer() can fail if the ssrc does not match any send channel.
-    LOG(LS_ERROR) << "SetAudioSend: ssrc is incorrect: " << ssrc;
-    return;
-  }
-  if (!voice_channel_->MuteStream(ssrc, !enable)) {
-    // Allow that MuteStream fail if |enable| is false but assert otherwise.
-    // This in the normal case when the underlying media channel has already
-    // been deleted.
-    ASSERT(enable == false);
-    return;
-  }
-  if (enable)
-    voice_channel_->SetChannelOptions(options);
-}
-
-void WebRtcSession::SetAudioPlayoutVolume(uint32 ssrc, double volume) {
-  ASSERT(signaling_thread()->IsCurrent());
-  ASSERT(volume >= 0 && volume <= 10);
-  if (!voice_channel_) {
-    LOG(LS_ERROR) << "SetAudioPlayoutVolume: No audio channel exists.";
-    return;
-  }
-
-  if (!voice_channel_->SetOutputScaling(ssrc, volume, volume))
-    ASSERT(false);
-}
-
-bool WebRtcSession::SetCaptureDevice(uint32 ssrc,
-                                     cricket::VideoCapturer* camera) {
-  ASSERT(signaling_thread()->IsCurrent());
-
-  if (!video_channel_.get()) {
-    // |video_channel_| doesnt't exist. Probably because the remote end doesnt't
-    // support video.
-    LOG(LS_WARNING) << "Video not used in this call.";
-    return false;
-  }
-  if (!video_channel_->SetCapturer(ssrc, camera)) {
-    // Allow that SetCapturer fail if |camera| is NULL but assert otherwise.
-    // This in the normal case when the underlying media channel has already
-    // been deleted.
-    ASSERT(camera == NULL);
-    return false;
-  }
-  return true;
-}
-
-void WebRtcSession::SetVideoPlayout(uint32 ssrc,
-                                    bool enable,
-                                    cricket::VideoRenderer* renderer) {
-  ASSERT(signaling_thread()->IsCurrent());
-  if (!video_channel_) {
-    LOG(LS_WARNING) << "SetVideoPlayout: No video channel exists.";
-    return;
-  }
-  if (!video_channel_->SetRenderer(ssrc, enable ? renderer : NULL)) {
-    // Allow that SetRenderer fail if |renderer| is NULL but assert otherwise.
-    // This in the normal case when the underlying media channel has already
-    // been deleted.
-    ASSERT(renderer == NULL);
-  }
-}
-
-void WebRtcSession::SetVideoSend(uint32 ssrc, bool enable,
-                                 const cricket::VideoOptions* options) {
-  ASSERT(signaling_thread()->IsCurrent());
-  if (!video_channel_) {
-    LOG(LS_WARNING) << "SetVideoSend: No video channel exists.";
-    return;
-  }
-  if (!video_channel_->MuteStream(ssrc, !enable)) {
-    // Allow that MuteStream fail if |enable| is false but assert otherwise.
-    // This in the normal case when the underlying media channel has already
-    // been deleted.
-    ASSERT(enable == false);
-    return;
-  }
-  if (enable && options)
-    video_channel_->SetChannelOptions(*options);
-}
-
-bool WebRtcSession::CanInsertDtmf(const std::string& track_id) {
-  ASSERT(signaling_thread()->IsCurrent());
-  if (!voice_channel_) {
-    LOG(LS_ERROR) << "CanInsertDtmf: No audio channel exists.";
-    return false;
-  }
-  uint32 send_ssrc = 0;
-  // The Dtmf is negotiated per channel not ssrc, so we only check if the ssrc
-  // exists.
-  if (!GetAudioSsrcByTrackId(BaseSession::local_description(), track_id,
-                             &send_ssrc)) {
-    LOG(LS_ERROR) << "CanInsertDtmf: Track does not exist: " << track_id;
-    return false;
-  }
-  return voice_channel_->CanInsertDtmf();
-}
-
-bool WebRtcSession::InsertDtmf(const std::string& track_id,
-                               int code, int duration) {
-  ASSERT(signaling_thread()->IsCurrent());
-  if (!voice_channel_) {
-    LOG(LS_ERROR) << "InsertDtmf: No audio channel exists.";
-    return false;
-  }
-  uint32 send_ssrc = 0;
-  if (!VERIFY(GetAudioSsrcByTrackId(BaseSession::local_description(),
-                                    track_id, &send_ssrc))) {
-    LOG(LS_ERROR) << "InsertDtmf: Track does not exist: " << track_id;
-    return false;
-  }
-  if (!voice_channel_->InsertDtmf(send_ssrc, code, duration,
-                                  cricket::DF_SEND)) {
-    LOG(LS_ERROR) << "Failed to insert DTMF to channel.";
-    return false;
-  }
-  return true;
-}
-
-sigslot::signal0<>* WebRtcSession::GetOnDestroyedSignal() {
-  return &SignalVoiceChannelDestroyed;
 }
 
 bool WebRtcSession::SendData(const cricket::SendDataParams& params,
@@ -1327,12 +1063,6 @@ void WebRtcSession::OnCandidatesAllocationDone() {
 
 // Enabling voice and video channel.
 void WebRtcSession::EnableChannels() {
-  if (voice_channel_ && !voice_channel_->enabled())
-    voice_channel_->Enable(true);
-
-  if (video_channel_ && !video_channel_->enabled())
-    video_channel_->Enable(true);
-
   if (data_channel_.get() && !data_channel_->enabled())
     data_channel_->Enable(true);
 }
@@ -1452,28 +1182,6 @@ bool WebRtcSession::UseCandidate(
 
 void WebRtcSession::RemoveUnusedChannelsAndTransports(
     const SessionDescription* desc) {
-  // Destroy video_channel_ first since it may have a pointer to the
-  // voice_channel_.
-  const cricket::ContentInfo* video_info =
-      cricket::GetFirstVideoContent(desc);
-  if ((!video_info || video_info->rejected) && video_channel_) {
-    mediastream_signaling_->OnVideoChannelClose();
-    SignalVideoChannelDestroyed();
-    const std::string content_name = video_channel_->content_name();
-    channel_manager_->DestroyVideoChannel(video_channel_.release());
-    DestroyTransportProxy(content_name);
-  }
-
-  const cricket::ContentInfo* voice_info =
-      cricket::GetFirstAudioContent(desc);
-  if ((!voice_info || voice_info->rejected) && voice_channel_) {
-    mediastream_signaling_->OnAudioChannelClose();
-    SignalVoiceChannelDestroyed();
-    const std::string content_name = voice_channel_->content_name();
-    channel_manager_->DestroyVoiceChannel(voice_channel_.release());
-    DestroyTransportProxy(content_name);
-  }
-
   const cricket::ContentInfo* data_info =
       cricket::GetFirstDataContent(desc);
   if ((!data_info || data_info->rejected) && data_channel_) {
@@ -1495,23 +1203,6 @@ bool WebRtcSession::CreateChannels(const SessionDescription* desc) {
                                 ~cricket::PORTALLOCATOR_ENABLE_BUNDLE);
   }
 
-  // Creating the media channels and transport proxies.
-  const cricket::ContentInfo* voice = cricket::GetFirstAudioContent(desc);
-  if (voice && !voice->rejected && !voice_channel_) {
-    if (!CreateVoiceChannel(voice)) {
-      LOG(LS_ERROR) << "Failed to create voice channel.";
-      return false;
-    }
-  }
-
-  const cricket::ContentInfo* video = cricket::GetFirstVideoContent(desc);
-  if (video && !video->rejected && !video_channel_) {
-    if (!CreateVideoChannel(video)) {
-      LOG(LS_ERROR) << "Failed to create video channel.";
-      return false;
-    }
-  }
-
   const cricket::ContentInfo* data = cricket::GetFirstDataContent(desc);
   if (data_channel_type_ != cricket::DCT_NONE &&
       data && !data->rejected && !data_channel_.get()) {
@@ -1522,22 +1213,6 @@ bool WebRtcSession::CreateChannels(const SessionDescription* desc) {
   }
 
   return true;
-}
-
-bool WebRtcSession::CreateVoiceChannel(const cricket::ContentInfo* content) {
-  voice_channel_.reset(channel_manager_->CreateVoiceChannel(
-      this, content->name, true));
-  if (!voice_channel_.get())
-    return false;
-
-  voice_channel_->SetChannelOptions(audio_options_);
-  return true;
-}
-
-bool WebRtcSession::CreateVideoChannel(const cricket::ContentInfo* content) {
-  video_channel_.reset(channel_manager_->CreateVideoChannel(
-      this, content->name, true, video_options_, voice_channel_.get()));
-  return video_channel_.get() != NULL;
 }
 
 bool WebRtcSession::CreateDataChannel(const cricket::ContentInfo* content) {

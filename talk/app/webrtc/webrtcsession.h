@@ -31,7 +31,6 @@
 #include <string>
 
 #include "talk/app/webrtc/datachannel.h"
-#include "talk/app/webrtc/dtmfsender.h"
 #include "talk/app/webrtc/mediastreamprovider.h"
 #include "talk/app/webrtc/peerconnectioninterface.h"
 #include "talk/app/webrtc/statstypes.h"
@@ -48,9 +47,6 @@ class ChannelManager;
 class DataChannel;
 class StatsReport;
 class Transport;
-class VideoCapturer;
-class VideoChannel;
-class VoiceChannel;
 
 }  // namespace cricket
 
@@ -102,10 +98,7 @@ class IceObserver {
 };
 
 class WebRtcSession : public cricket::BaseSession,
-                      public AudioProviderInterface,
                       public DataChannelFactory,
-                      public VideoProviderInterface,
-                      public DtmfProviderInterface,
                       public DataChannelProviderInterface {
  public:
   WebRtcSession(cricket::ChannelManager* channel_manager,
@@ -127,12 +120,6 @@ class WebRtcSession : public cricket::BaseSession,
     ice_observer_ = observer;
   }
 
-  virtual cricket::VoiceChannel* voice_channel() {
-    return voice_channel_.get();
-  }
-  virtual cricket::VideoChannel* video_channel() {
-    return video_channel_.get();
-  }
   virtual cricket::DataChannel* data_channel() {
     return data_channel_.get();
   }
@@ -168,34 +155,6 @@ class WebRtcSession : public cricket::BaseSession,
   const SessionDescriptionInterface* remote_description() const {
     return remote_desc_.get();
   }
-
-  // Get the id used as a media stream track's "id" field from ssrc.
-  virtual bool GetLocalTrackIdBySsrc(uint32 ssrc, std::string* track_id);
-  virtual bool GetRemoteTrackIdBySsrc(uint32 ssrc, std::string* track_id);
-
-
-  // AudioMediaProviderInterface implementation.
-  virtual void SetAudioPlayout(uint32 ssrc, bool enable,
-                               cricket::AudioRenderer* renderer) OVERRIDE;
-  virtual void SetAudioSend(uint32 ssrc, bool enable,
-                            const cricket::AudioOptions& options,
-                            cricket::AudioRenderer* renderer) OVERRIDE;
-  virtual void SetAudioPlayoutVolume(uint32 ssrc, double volume) OVERRIDE;
-
-  // Implements VideoMediaProviderInterface.
-  virtual bool SetCaptureDevice(uint32 ssrc,
-                                cricket::VideoCapturer* camera) OVERRIDE;
-  virtual void SetVideoPlayout(uint32 ssrc,
-                               bool enable,
-                               cricket::VideoRenderer* renderer) OVERRIDE;
-  virtual void SetVideoSend(uint32 ssrc, bool enable,
-                            const cricket::VideoOptions* options) OVERRIDE;
-
-  // Implements DtmfProviderInterface.
-  virtual bool CanInsertDtmf(const std::string& track_id);
-  virtual bool InsertDtmf(const std::string& track_id,
-                          int code, int duration);
-  virtual sigslot::signal0<>* GetOnDestroyedSignal();
 
   // Implements DataChannelProviderInterface.
   virtual bool SendData(const cricket::SendDataParams& params,
@@ -286,8 +245,6 @@ class WebRtcSession : public cricket::BaseSession,
   bool CreateChannels(const cricket::SessionDescription* desc);
 
   // Helper methods to create media channels.
-  bool CreateVoiceChannel(const cricket::ContentInfo* content);
-  bool CreateVideoChannel(const cricket::ContentInfo* content);
   bool CreateDataChannel(const cricket::ContentInfo* content);
 
   // Copy the candidates from |saved_candidates_| to |dest_desc|.
@@ -332,8 +289,6 @@ class WebRtcSession : public cricket::BaseSession,
   // of IPv4/IPv6 as best connection.
   void ReportBestConnectionState(cricket::Transport* transport);
 
-  rtc::scoped_ptr<cricket::VoiceChannel> voice_channel_;
-  rtc::scoped_ptr<cricket::VideoChannel> video_channel_;
   rtc::scoped_ptr<cricket::DataChannel> data_channel_;
   cricket::ChannelManager* channel_manager_;
   MediaStreamSignaling* mediastream_signaling_;
@@ -359,13 +314,9 @@ class WebRtcSession : public cricket::BaseSession,
   rtc::scoped_ptr<WebRtcSessionDescriptionFactory>
       webrtc_session_desc_factory_;
 
-  sigslot::signal0<> SignalVoiceChannelDestroyed;
-  sigslot::signal0<> SignalVideoChannelDestroyed;
   sigslot::signal0<> SignalDataChannelDestroyed;
 
   // Member variables for caching global options.
-  cricket::AudioOptions audio_options_;
-  cricket::VideoOptions video_options_;
   MetricsObserverInterface* metrics_observer_;
 
   DISALLOW_COPY_AND_ASSIGN(WebRtcSession);

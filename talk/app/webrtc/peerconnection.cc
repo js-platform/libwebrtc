@@ -29,17 +29,13 @@
 
 #include <vector>
 
-#include "talk/app/webrtc/dtmfsender.h"
 #include "talk/app/webrtc/jsepicecandidate.h"
 #include "talk/app/webrtc/jsepsessiondescription.h"
 #include "talk/app/webrtc/mediaconstraintsinterface.h"
-#include "talk/app/webrtc/mediastreamhandler.h"
-#include "talk/app/webrtc/streamcollection.h"
 #include "webrtc/p2p/client/basicportallocator.h"
 #include "talk/session/media/channelmanager.h"
 #include "webrtc/base/logging.h"
 #include "webrtc/base/stringencode.h"
-#include "webrtc/system_wrappers/interface/field_trial.h"
 
 namespace {
 
@@ -280,22 +276,6 @@ bool ParseIceServers(const PeerConnectionInterface::IceServers& configuration,
   return true;
 }
 
-// Check if we can send |new_stream| on a PeerConnection.
-// Currently only one audio but multiple video track is supported per
-// PeerConnection.
-bool CanAddLocalMediaStream(webrtc::StreamCollectionInterface* current_streams,
-                            webrtc::MediaStreamInterface* new_stream) {
-  if (!new_stream || !current_streams)
-    return false;
-  if (current_streams->find(new_stream->label()) != NULL) {
-    LOG(LS_ERROR) << "MediaStream with label " << new_stream->label()
-                  << " is already added.";
-    return false;
-  }
-
-  return true;
-}
-
 }  // namespace
 
 namespace webrtc {
@@ -313,8 +293,6 @@ PeerConnection::PeerConnection(PeerConnectionFactory* factory)
 PeerConnection::~PeerConnection() {
   if (mediastream_signaling_)
     mediastream_signaling_->TearDown();
-  if (stream_handler_container_)
-    stream_handler_container_->TearDown();
 }
 
 bool PeerConnection::Initialize(
@@ -361,9 +339,6 @@ bool PeerConnection::DoInitialize(
     if (value) {
       portallocator_flags |= cricket::PORTALLOCATOR_ENABLE_IPV6;
     }
-  } else if (webrtc::field_trial::FindFullName("WebRTC-IPv6Default") ==
-             "Enabled") {
-    portallocator_flags |= cricket::PORTALLOCATOR_ENABLE_IPV6;
   }
 
   port_allocator_->set_flags(portallocator_flags);
@@ -378,8 +353,6 @@ bool PeerConnection::DoInitialize(
                                    factory_->worker_thread(),
                                    port_allocator_.get(),
                                    mediastream_signaling_.get()));
-  stream_handler_container_.reset(new MediaStreamHandlerContainer(
-      session_.get(), session_.get()));
   stats_.reset(new StatsCollector(session_.get()));
 
   // Initialize the WebRtcSession. It creates transport channels etc.
@@ -394,62 +367,7 @@ bool PeerConnection::DoInitialize(
   return true;
 }
 
-rtc::scoped_refptr<StreamCollectionInterface>
-PeerConnection::local_streams() {
-  return mediastream_signaling_->local_streams();
-}
-
-rtc::scoped_refptr<StreamCollectionInterface>
-PeerConnection::remote_streams() {
-  return mediastream_signaling_->remote_streams();
-}
-
-bool PeerConnection::AddStream(MediaStreamInterface* local_stream) {
-  if (IsClosed()) {
-    return false;
-  }
-  if (!CanAddLocalMediaStream(mediastream_signaling_->local_streams(),
-                              local_stream))
-    return false;
-
-  if (!mediastream_signaling_->AddLocalStream(local_stream)) {
-    return false;
-  }
-  stats_->AddStream(local_stream);
-  observer_->OnRenegotiationNeeded();
-  return true;
-}
-
-void PeerConnection::RemoveStream(MediaStreamInterface* local_stream) {
-  mediastream_signaling_->RemoveLocalStream(local_stream);
-  if (IsClosed()) {
-    return;
-  }
-  observer_->OnRenegotiationNeeded();
-}
-
-rtc::scoped_refptr<DtmfSenderInterface> PeerConnection::CreateDtmfSender(
-    AudioTrackInterface* track) {
-  if (!track) {
-    LOG(LS_ERROR) << "CreateDtmfSender - track is NULL.";
-    return NULL;
-  }
-  if (!mediastream_signaling_->local_streams()->FindAudioTrack(track->id())) {
-    LOG(LS_ERROR) << "CreateDtmfSender is called with a non local audio track.";
-    return NULL;
-  }
-
-  rtc::scoped_refptr<DtmfSenderInterface> sender(
-      DtmfSender::Create(track, signaling_thread(), session_.get()));
-  if (!sender.get()) {
-    LOG(LS_ERROR) << "CreateDtmfSender failed on DtmfSender::Create.";
-    return NULL;
-  }
-  return DtmfSenderProxy::Create(signaling_thread(), sender.get());
-}
-
 bool PeerConnection::GetStats(StatsObserver* observer,
-                              MediaStreamTrackInterface* track,
                               StatsOutputLevel level) {
   ASSERT(signaling_thread()->IsCurrent());
   if (!VERIFY(observer != NULL)) {
@@ -458,8 +376,7 @@ bool PeerConnection::GetStats(StatsObserver* observer,
   }
 
   stats_->UpdateStats(level);
-  signaling_thread()->Post(this, MSG_GETSTATS,
-                           new GetStatsMsg(observer, track));
+
   return true;
 }
 
@@ -762,7 +679,7 @@ void PeerConnection::OnMessage(rtc::Message* msg) {
     case MSG_GETSTATS: {
       GetStatsMsg* param = static_cast<GetStatsMsg*>(msg->pdata);
       StatsReports reports;
-      stats_->GetStats(param->track, &reports);
+      stats_->GetStats(&reports);
       param->observer->OnComplete(reports);
       delete param;
       break;
@@ -773,70 +690,9 @@ void PeerConnection::OnMessage(rtc::Message* msg) {
   }
 }
 
-void PeerConnection::OnAddRemoteStream(MediaStreamInterface* stream) {
-  stats_->AddStream(stream);
-  observer_->OnAddStream(stream);
-}
-
-void PeerConnection::OnRemoveRemoteStream(MediaStreamInterface* stream) {
-  stream_handler_container_->RemoveRemoteStream(stream);
-  observer_->OnRemoveStream(stream);
-}
-
 void PeerConnection::OnAddDataChannel(DataChannelInterface* data_channel) {
   observer_->OnDataChannel(DataChannelProxy::Create(signaling_thread(),
                                                     data_channel));
-}
-
-void PeerConnection::OnAddRemoteAudioTrack(MediaStreamInterface* stream,
-                                           AudioTrackInterface* audio_track,
-                                           uint32 ssrc) {
-  stream_handler_container_->AddRemoteAudioTrack(stream, audio_track, ssrc);
-}
-
-void PeerConnection::OnAddRemoteVideoTrack(MediaStreamInterface* stream,
-                                           VideoTrackInterface* video_track,
-                                           uint32 ssrc) {
-  stream_handler_container_->AddRemoteVideoTrack(stream, video_track, ssrc);
-}
-
-void PeerConnection::OnRemoveRemoteAudioTrack(
-    MediaStreamInterface* stream,
-    AudioTrackInterface* audio_track) {
-  stream_handler_container_->RemoveRemoteTrack(stream, audio_track);
-}
-
-void PeerConnection::OnRemoveRemoteVideoTrack(
-    MediaStreamInterface* stream,
-    VideoTrackInterface* video_track) {
-  stream_handler_container_->RemoveRemoteTrack(stream, video_track);
-}
-void PeerConnection::OnAddLocalAudioTrack(MediaStreamInterface* stream,
-                                          AudioTrackInterface* audio_track,
-                                          uint32 ssrc) {
-  stream_handler_container_->AddLocalAudioTrack(stream, audio_track, ssrc);
-  stats_->AddLocalAudioTrack(audio_track, ssrc);
-}
-void PeerConnection::OnAddLocalVideoTrack(MediaStreamInterface* stream,
-                                          VideoTrackInterface* video_track,
-                                          uint32 ssrc) {
-  stream_handler_container_->AddLocalVideoTrack(stream, video_track, ssrc);
-}
-
-void PeerConnection::OnRemoveLocalAudioTrack(MediaStreamInterface* stream,
-                                             AudioTrackInterface* audio_track,
-                                             uint32 ssrc) {
-  stream_handler_container_->RemoveLocalTrack(stream, audio_track);
-  stats_->RemoveLocalAudioTrack(audio_track, ssrc);
-}
-
-void PeerConnection::OnRemoveLocalVideoTrack(MediaStreamInterface* stream,
-                                             VideoTrackInterface* video_track) {
-  stream_handler_container_->RemoveLocalTrack(stream, video_track);
-}
-
-void PeerConnection::OnRemoveLocalStream(MediaStreamInterface* stream) {
-  stream_handler_container_->RemoveLocalStream(stream);
 }
 
 void PeerConnection::OnIceConnectionChange(

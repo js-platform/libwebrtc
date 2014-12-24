@@ -90,8 +90,6 @@ class MediaMonitorT : public MediaMonitor {
   MI media_info_;
 };
 
-typedef MediaMonitorT<VoiceMediaChannel, VoiceMediaInfo> VoiceMediaMonitor;
-typedef MediaMonitorT<VideoMediaChannel, VideoMediaInfo> VideoMediaMonitor;
 typedef MediaMonitorT<DataMediaChannel, DataMediaInfo> DataMediaMonitor;
 
 }  // namespace cricket
