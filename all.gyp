@@ -20,7 +20,7 @@
       'dependencies': [
         'webrtc/webrtc.gyp:*',
         '<(libjingle_root)/talk/libjingle.gyp:*',
-        '<(libjingle_root)/talk/libjingle_examples.gyp:*',
+        '<(libjingle_root)/talk/wrtc_build.gyp:*',
         #'<@(webrtc_root_additional_dependencies)',
       ],
       'conditions': [
