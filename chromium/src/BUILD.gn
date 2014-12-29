@@ -1,0 +1,361 @@
+# Copyright (c) 2013 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This is the root build file for GN. GN will start processing by loading this
+# file, and recursively load all dependencies until all dependencies are either
+# resolved or known not to exist (which will cause the build to fail). So if
+# you add a new build file, there must be some path of dependencies from this
+# file to your new one or GN won't know about it.
+
+import("//build/config/ui.gni")
+if (is_android) {
+  import("//build/config/android/config.gni")
+}
+
+declare_args() {
+  # A list of extra dependencies to add to the root target. This allows a
+  # checkout to add additional targets without explicitly changing any checked-
+  # in files.
+  root_extra_deps = []
+}
+
+# In GN, a "group" is a dummy target that just lists other targets.
+group("root") {
+  # This should not be linked into production and depends on test targets.
+  testonly = true
+
+  # Note that some dependencies are commented out. These are things that are
+  # currently written but not hooked up to the build yet. They may need to be
+  # completed or possibly just tested and then re-enabled.
+  deps = [
+    "//apps",
+    "//ash",
+    "//cc",
+    "//cc/blink",
+    "//chrome/browser",
+    "//chrome/browser/devtools",
+    "//chrome/common",
+    "//chrome/plugin",
+    "//chrome/renderer",
+    "//chrome/test",
+    "//chrome/tools",
+    "//chrome/utility",
+    "//components:all_components",
+    "//content",
+    "//content/shell:content_shell",
+    "//content/test:test_support",
+    "//crypto",
+    "//device/battery",
+    "//device/bluetooth",
+    "//device/nfc",
+    "//extensions/browser",
+    "//extensions/common",
+    "//extensions/common/api",
+    "//extensions/renderer",
+    "//gin",
+    "//gpu",
+    "//google_apis",
+    "//google_apis/gcm",
+    "//ipc",
+    "//ipc/mojo",
+    "//jingle:notifier",
+    "//media",
+    "//media/blink",
+    "//media/cast",
+    "//media/mojo",
+    "//mojo",
+    "//net",
+    "//pdf",
+    "//ppapi:ppapi_c",
+    "//printing",
+    "//remoting/client/plugin",
+    "//sandbox",
+    "//sdch",
+    "//skia",
+    "//storage/browser",
+    "//sql",
+    "//sync",
+    "//third_party/WebKit/public:all_blink",
+    "//third_party/angle:translator",
+    "//third_party/brotli",
+    "//third_party/cacheinvalidation",
+    "//third_party/cld",
+    "//third_party/cld_2",
+    "//third_party/ffmpeg",
+    "//third_party/flac",
+    "//third_party/harfbuzz-ng",
+    "//third_party/hunspell",
+    "//third_party/iccjpeg",
+    "//third_party/icu",
+    "//third_party/leveldatabase",
+    "//third_party/libphonenumber",
+    "//third_party/libjingle",
+    "//third_party/libpng",
+    "//third_party/libsrtp",
+    "//third_party/libusb",
+    "//third_party/libwebm",
+    "//third_party/libwebp",
+    "//third_party/libxslt",
+    "//third_party/libvpx",
+    "//third_party/libyuv",
+    "//third_party/lzma_sdk",
+    "//third_party/mesa",
+    "//third_party/opus",
+    "//third_party/ots",
+    "//third_party/protobuf:protobuf_lite",
+    "//third_party/qcms",
+    "//third_party/re2",
+    "//third_party/smhasher:cityhash",
+    "//third_party/smhasher:murmurhash3",
+    "//third_party/smhasher:pmurhash",
+    "//third_party/snappy",
+    "//third_party/speex",
+    "//third_party/usrsctp",
+    "//third_party/widevine/cdm:version_h",
+    "//third_party/webrtc",
+    "//third_party/zlib",
+    "//third_party:jpeg",
+    "//tools/gn",
+    "//tools/imagediff($host_toolchain)",
+    "//ui/accessibility",
+    "//ui/app_list",
+    "//ui/aura",
+    "//ui/base",
+    "//ui/display",
+    "//ui/events",
+    "//ui/gfx",
+    "//ui/gl",
+    "//ui/keyboard",
+    "//ui/native_theme",
+    "//ui/resources",
+    "//ui/snapshot",
+    "//ui/strings",
+    "//ui/surface",
+    "//ui/views",
+    "//ui/views/controls/webview",
+    "//ui/web_dialogs",
+    "//url",
+    "//v8:v8",
+  ]
+  deps += root_extra_deps
+
+  if (!is_win) {
+    deps += [ "//breakpad:symupload" ]
+  }
+
+  if (is_linux) {
+    deps += [
+      "//dbus",
+      "//third_party/fontconfig",
+      "//third_party/freetype2",
+    ]
+  }
+
+  if (use_x11) {
+    deps += [ "//tools/xdisplaycheck" ]
+  }
+
+  if (use_aura) {
+    deps += [ "//ui/wm" ]
+  }
+
+  if (is_win) {
+    deps += [ "//ui/metro_viewer" ]
+  }
+
+  if (is_win || is_mac || is_chromeos) {
+    # RLZ works on these platforms.
+    deps += [ "//rlz:rlz_lib" ]
+  }
+
+  if (cpu_arch == "x86" || cpu_arch == "x64") {
+    # YASM is x86/x64 only.
+    deps += [ "//third_party/yasm($host_toolchain)" ]
+  }
+
+  if (is_android) {
+    deps += [
+      "//base/android/linker:chromium_android_linker",
+      "//build/android/gyp/test:hello_world",
+      "//build/android/rezip",
+      "//third_party/openmax_dl/dl",
+      "//content/shell/android:content_shell_apk",
+      "//chrome/android:chrome_shell_apk",
+      "//chrome/test/chromedriver/test/webview_shell:chromedriver_webview_shell_apk",
+      "//ui/android:ui_java",
+      "//third_party/android_tools:android_gcm_java",
+      "//third_party/android_tools:uiautomator_java",
+      "//third_party/android_tools:android_support_v13_java",
+      "//third_party/android_tools:android_support_v7_appcompat_java",
+      "//third_party/android_tools:android_support_v7_mediarouter_java",
+    ]
+
+    if (has_chrome_android_internal) {
+      deps += [ "//clank" ]
+    }
+
+    # TODO(GYP): Move the targets in the rest of this block that still
+    # need to be made to work in the GN build to the bottom of the file
+    # so that all the remaining work is located in one place in the file.
+    # This block should contain only the targets that aren't actually
+    # needed on Android.
+
+    deps -= [
+      "//apps",  # Needs testing.
+      "//chrome/browser",
+      "//chrome/browser/devtools",
+      "//chrome/common",
+      "//chrome/plugin",
+      "//chrome/renderer",
+      "//chrome/test",
+      "//chrome/tools",
+      "//chrome/utility",
+      "//content/shell:content_shell",
+      "//extensions/browser",
+      "//extensions/common",
+      "//extensions/common/api",
+      "//extensions/renderer",
+      "//pdf",  # Not compiled on Android in GYP yet, either.
+      "//ppapi:ppapi_c",
+      "//third_party/libusb",
+      "//ui/keyboard",  # Blocked on content.
+
+      # Seems to not be compiled on Android. Otherwise it will need a config.h.
+      "//third_party/libxslt",
+
+      # Not relevant to Android.
+      "//ash",
+      "//tools/gn",
+      "//ui/aura",
+      "//ui/display",
+      "//ui/views",
+      "//ui/views/controls/webview",
+
+      # Fails on Android for unknown reasons.
+      "//third_party/flac",
+      "//breakpad:symupload",
+
+      # Not tested on Android yet:
+      "//google_apis/gcm",
+      "//remoting/client/plugin",
+      "//storage/browser",
+      "//third_party/cld_2",
+      "//third_party/ffmpeg",
+      "//ui/app_list",
+      "//ui/web_dialogs",
+    ]
+  }
+
+  if (use_ozone) {
+    deps += [
+      "//ui/ozone",
+      "//ui/ozone/demo",
+    ]
+  }
+
+  # Non-mobile builds.
+  if (!is_android && !is_ios) {
+    deps += [
+      "//device/usb",
+      "//third_party/pdfium/samples",
+    ]
+  }
+
+  #
+  # TODO(GYP): Make everything below this work in the GN build.
+  #
+
+  if (is_mac) {
+    # TODO(dpranke): These are as-yet untriaged but need at least the above.
+    deps -= [
+      "//apps",
+      "//ash",
+      "//chrome/browser",
+      "//chrome/browser/devtools",
+      "//chrome/common",
+      "//chrome/plugin",
+      "//chrome/renderer",
+      "//chrome/test",
+      "//chrome/utility",
+      "//components:all_components",
+      "//content/shell:content_shell",
+      "//extensions/browser",
+      "//extensions/common",
+      "//extensions/common/api",
+      "//extensions/renderer",
+      "//remoting/client/plugin",
+      "//third_party/usrsctp",
+      "//ui/app_list",
+      "//ui/aura",
+      "//ui/keyboard",
+      "//ui/views",
+      "//ui/views/controls/webview",
+      "//ui/web_dialogs",
+    ]
+  }
+
+  if (is_win) {
+    deps -= [
+      "//apps",
+      "//ash",
+      "//chrome/browser",
+      "//chrome/browser/devtools",
+      "//chrome/common",
+      "//chrome/plugin",
+      "//chrome/renderer",
+      "//chrome/test",
+      "//chrome/utility",
+      "//components:all_components",
+      "//cc",
+      "//cc/blink",
+      "//content",
+      "//content/shell:content_shell",
+      "//content/test:test_support",
+      "//device/bluetooth",
+      "//extensions/browser",
+      "//extensions/common",
+      "//extensions/common/api",
+      "//extensions/renderer",
+      "//gpu",
+      "//google_apis",
+      "//google_apis/gcm",
+      "//jingle:notifier",
+      "//media",
+      "//media/blink",
+      "//media/cast",
+      "//media/mojo",
+      "//mojo",
+      "//pdf",
+      "//ppapi:ppapi_c",
+      "//printing",
+      "//remoting/client/plugin",
+      "//sandbox",
+      "//storage/browser",
+      "//sync",
+      "//third_party/WebKit/public:all_blink",
+      "//third_party/angle:translator",
+      "//third_party/ffmpeg",
+      "//third_party/leveldatabase",
+      "//third_party/libjingle",
+      "//third_party/usrsctp",
+      "//third_party/webrtc",
+      "//ui/accessibility",
+      "//ui/app_list",
+      "//ui/aura",
+      "//ui/base",
+      "//ui/display",
+      "//ui/events",
+      "//ui/gfx",
+      "//ui/gl",
+      "//ui/keyboard",
+      "//ui/native_theme",
+      "//ui/snapshot",
+      "//ui/surface",
+      "//ui/views",
+      "//ui/views/controls/webview",
+      "//ui/web_dialogs",
+      "//ui/wm",
+    ]
+  }
+}
