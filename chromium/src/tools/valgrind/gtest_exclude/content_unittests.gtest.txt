@@ -1,0 +1,12 @@
+# False positive, according to crbug.com/386080
+WebLayerImplFixedBoundsTest.CompareToWebLayerImplComplex
+WebLayerImplFixedBoundsTest.CompareToWebLayerImplSimple
+
+# Flaky http://crbug.com/413775
+ServiceWorkerCacheStorageManagerTests/ServiceWorkerCacheStorageManagerTestP.RecreateCacheOnDemand/1
+
+# http://crbug.com/418258
+DevToolsManagerTest.TestObserver
+
+# http://crbug.com/430391
+WebDataConsumerHandleImplTest.*

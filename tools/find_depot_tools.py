@@ -1,0 +1,1 @@
+../chromium/src/tools/find_depot_tools.py

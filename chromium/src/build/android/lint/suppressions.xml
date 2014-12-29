@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+  <!--
+STOP! It looks like you want to suppress some lint errors:
+- Have you tried identifing the offending patch?
+  Ask the author for a fix and/or revert the patch.
+- It is preferred to add suppressions in the code instead of
+  sweeping it under the rug here. See:
+
+    http://developer.android.com/tools/debugging/improving-w-lint.html
+
+Still reading?
+- You can edit this file manually to suppress an issue
+  globally if it is not applicable to the project.
+- You can also automatically add issues found so for in the
+  build process by running:
+
+    build/android/lint/suppress.py
+
+  which will generate this file (Comments are not preserved).
+  Note: PRODUCT_DIR will be substituted at run-time with actual
+  directory path (e.g. out/Debug)
+-->
+  <issue id="AllowBackup">
+    <ignore path="AndroidManifest.xml"/>
+  </issue>
+  <issue id="Assert" severity="ignore"/>
+  <issue id="CommitPrefEdits">
+    <ignore path="third_party/cacheinvalidation/src/java/com/google/ipc/invalidation/ticl/android2/channel/AndroidChannelPreferences.java"/>
+  </issue>
+  <issue id="DefaultLocale">
+    <ignore path="third_party/cacheinvalidation/src/java/com/google/ipc/invalidation/external/client/contrib/AndroidListenerState.java"/>
+  </issue>
+  <issue id="DrawAllocation">
+    <ignore path="content/public/android/java/src/org/chromium/content/browser/ContentViewRenderView.java"/>
+    <ignore path="content/public/android/java/src/org/chromium/content/browser/PopupZoomer.java"/>
+  </issue>
+  <issue id="ExportedContentProvider">
+    <ignore path="AndroidManifest.xml"/>
+  </issue>
+  <issue id="HandlerLeak">
+    <ignore path="remoting/android/java/src/org/chromium/chromoting/TapGestureDetector.java"/>
+  </issue>
+  <issue id="MissingApplicationIcon" severity="ignore"/>
+  <issue id="MissingRegistered" severity="ignore"/>
+  <issue id="MissingVersion">
+    <ignore path="AndroidManifest.xml"/>
+  </issue>
+  <!-- Disabling is InlinedApi and NewApi is bad but we have too many of these errors and nobody is fixing it. crbug.com/411461 -->
+  <issue id="InlinedApi" severity="ignore"/>
+  <issue id="NewApi" severity="ignore"/>
+  <issue id="OldTargetApi">
+    <ignore path="AndroidManifest.xml"/>
+  </issue>
+  <issue id="Recycle" severity="ignore"/>
+  <issue id="Registered" severity="ignore"/>
+  <issue id="SdCardPath">
+    <ignore path="content/public/android/java/src/org/chromium/content/browser/MediaResourceGetter.java"/>
+  </issue>
+  <issue id="SetJavaScriptEnabled" severity="ignore"/>
+  <issue id="ViewConstructor" severity="ignore"/>
+  <issue id="WrongCall" severity="ignore"/>
+</lint>
