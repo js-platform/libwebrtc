@@ -638,6 +638,7 @@
       'use_lto%': 0,
       # Enable LTO on code compiled with -O2.
       'use_lto_o2%': 0,
+      'use_x11%' : 0,
 
       'conditions': [
         # A flag for POSIX platforms
@@ -677,11 +678,11 @@
         }],
 
         # Flags to use X11 on non-Mac POSIX platforms.
-        ['OS=="win" or OS=="mac" or OS=="ios" or OS=="android" or use_ozone==1', {
-          'use_x11%': 0,
-        }, {
-          'use_x11%': 1,
-        }],
+        #['OS=="win" or OS=="mac" or OS=="ios" or OS=="android" or use_ozone==1', {
+        #  'use_x11%': 0,
+        #}, {
+        #  'use_x11%': 1,
+        #}],
 
         # Flags to use glib.
         ['OS=="win" or OS=="mac" or OS=="ios" or OS=="android" or use_ozone==1', {
