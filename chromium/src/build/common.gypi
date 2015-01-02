@@ -62,7 +62,7 @@
           'toolkit_views%': 0,
 
           # Use the PCI lib to collect GPU information.
-          'use_libpci%': 1,
+          'use_libpci%': 0,
 
           # Use OpenSSL instead of NSS as the underlying SSL and crypto
           # implementation. Certificate verification will in most cases be
