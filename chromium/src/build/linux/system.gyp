@@ -558,45 +558,6 @@
   ],  # conditions
   'targets': [
     {
-      'target_name': 'glib',
-      'type': 'none',
-      'toolsets': ['host', 'target'],
-      'variables': {
-        'glib_packages': 'glib-2.0 gmodule-2.0 gobject-2.0 gthread-2.0',
-      },
-      'conditions': [
-        ['_toolset=="target"', {
-          'direct_dependent_settings': {
-            'cflags': [
-              '<!@(<(pkg-config) --cflags <(glib_packages))',
-            ],
-          },
-          'link_settings': {
-            'ldflags': [
-              '<!@(<(pkg-config) --libs-only-L --libs-only-other <(glib_packages))',
-            ],
-            'libraries': [
-              '<!@(<(pkg-config) --libs-only-l <(glib_packages))',
-            ],
-          },
-        }, {
-          'direct_dependent_settings': {
-            'cflags': [
-              '<!@(pkg-config --cflags <(glib_packages))',
-            ],
-          },
-          'link_settings': {
-            'ldflags': [
-              '<!@(pkg-config --libs-only-L --libs-only-other <(glib_packages))',
-            ],
-            'libraries': [
-              '<!@(pkg-config --libs-only-l <(glib_packages))',
-            ],
-          },
-        }],
-      ],
-    },
-    {
       'target_name': 'libcap',
       'type': 'none',
       'link_settings': {
