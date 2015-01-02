@@ -558,23 +558,6 @@
   ],  # conditions
   'targets': [
     {
-      'target_name': 'dbus',
-      'type': 'none',
-      'direct_dependent_settings': {
-        'cflags': [
-          '<!@(<(pkg-config) --cflags dbus-1)',
-        ],
-      },
-      'link_settings': {
-        'ldflags': [
-          '<!@(<(pkg-config) --libs-only-L --libs-only-other dbus-1)',
-        ],
-        'libraries': [
-          '<!@(<(pkg-config) --libs-only-l dbus-1)',
-        ],
-      },
-    },
-    {
       'target_name': 'glib',
       'type': 'none',
       'toolsets': ['host', 'target'],
