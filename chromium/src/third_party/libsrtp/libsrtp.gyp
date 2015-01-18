@@ -47,7 +47,7 @@
         ],
       }],
       ['target_arch=="arm" or target_arch=="armv7" or target_arch=="arm64" \
-       or target_arch=="mipsel" or target_arch=="mips64el"', {
+       or target_arch=="mipsel" or target_arch=="mips64el" or target_arch=="armv6"', {
         'defines': [
           # TODO(leozwang): CPU_RISC doesn't work properly on android/arm and
           # mips platforms for unknown reasons, need to investigate the root
