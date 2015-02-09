@@ -376,6 +376,8 @@ bool PeerConnection::GetStats(StatsObserver* observer,
   }
 
   stats_->UpdateStats(level);
+  signaling_thread()->Post(this, MSG_GETSTATS,
+                           new GetStatsMsg(observer, NULL));
 
   return true;
 }
