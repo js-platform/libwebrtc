@@ -545,7 +545,7 @@ StatsReport* StatsCollector::GetOrCreateReport(const std::string& type,
   ASSERT(session_->signaling_thread()->IsCurrent());
   ASSERT(type == StatsReport::kStatsReportTypeSsrc ||
          type == StatsReport::kStatsReportTypeRemoteSsrc);
-  StatsReport* report = GetReport(type, id, direction);
+  StatsReport* report = NULL;
   if (report == NULL) {
     std::string statsid = StatsId(type, id, direction);
     report = reports_.FindOrAddNew(statsid);
