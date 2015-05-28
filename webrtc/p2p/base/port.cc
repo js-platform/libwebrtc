@@ -1096,7 +1096,7 @@ void Connection::Destroy() {
 
 void Connection::UpdateState(uint32 now) {
   uint32 rtt = ConservativeRTTEstimate(rtt_);
-  if (GetMinLogSeverity() <= LS_VERBOSE){
+  if (rtc::LogMessage::GetMinLogSeverity() <= rtc::LS_VERBOSE){
     std::string pings;
     for (size_t i = 0; i < pings_since_last_response_.size(); ++i) {
       char buf[32];
