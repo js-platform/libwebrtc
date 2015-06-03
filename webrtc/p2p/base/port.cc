@@ -1096,19 +1096,19 @@ void Connection::Destroy() {
 
 void Connection::UpdateState(uint32 now) {
   uint32 rtt = ConservativeRTTEstimate(rtt_);
-
-  std::string pings;
-  for (size_t i = 0; i < pings_since_last_response_.size(); ++i) {
-    char buf[32];
-    rtc::sprintfn(buf, sizeof(buf), "%u",
-        pings_since_last_response_[i]);
-    pings.append(buf).append(" ");
+  if (rtc::LogMessage::GetMinLogSeverity() <= rtc::LS_VERBOSE){
+    std::string pings;
+    for (size_t i = 0; i < pings_since_last_response_.size(); ++i) {
+      char buf[32];
+      rtc::sprintfn(buf, sizeof(buf), "%u",
+          pings_since_last_response_[i]);
+      pings.append(buf).append(" ");
+    }
+    LOG_J(LS_VERBOSE, this) << "UpdateState(): pings_since_last_response_="
+                            << pings << ", rtt=" << rtt << ", now=" << now
+                            << ", last ping received: " << last_ping_received_
+                            << ", last data_received: " << last_data_received_;
   }
-  LOG_J(LS_VERBOSE, this) << "UpdateState(): pings_since_last_response_="
-                          << pings << ", rtt=" << rtt << ", now=" << now
-                          << ", last ping received: " << last_ping_received_
-                          << ", last data_received: " << last_data_received_;
-
   // Check the readable state.
   //
   // Since we don't know how many pings the other side has attempted, the best

@@ -42,5 +42,5 @@
 /out
 /x86-generic_out/
 /xcodebuild
-
+/chromium/src/third_party/llvm-build/
 !*.sha1
