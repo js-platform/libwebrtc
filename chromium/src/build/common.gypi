@@ -68,7 +68,7 @@
           # implementation. Certificate verification will in most cases be
           # handled by the OS. If OpenSSL's struct X509 is used to represent
           # certificates, use_openssl_certs must be set.
-          'use_openssl%': 0,
+          'use_openssl%': 1,
 
           # Typedef X509Certificate::OSCertHandle to OpenSSL's struct X509*.
           'use_openssl_certs%': 0,
