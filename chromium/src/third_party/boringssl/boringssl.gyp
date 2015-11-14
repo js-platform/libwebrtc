@@ -16,6 +16,7 @@
       'defines': [
         'BORINGSSL_IMPLEMENTATION',
         'BORINGSSL_NO_STATIC_INITIALIZER',
+        '_POSIX_C_SOURCE=200909L',
       ],
       # TODO(davidben): Fix size_t truncations in BoringSSL.
       # https://crbug.com/429039
