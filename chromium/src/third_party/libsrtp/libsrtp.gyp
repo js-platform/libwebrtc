@@ -39,6 +39,7 @@
           # All Windows architectures are this way.
           'SIZEOF_UNSIGNED_LONG=4',
           'SIZEOF_UNSIGNED_LONG_LONG=8',
+          'CPU_CISC',
          ],
       }],
       ['target_arch=="x64" or target_arch=="ia32"', {
